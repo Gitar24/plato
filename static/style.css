@@ -1,0 +1,21 @@
+body{
+    background-color: black;
+    font-family: 'JetBrains Mono', monospace
+}
+* {
+    color: rgb(212, 212, 212);
+}
+#input-textarea {
+    display: flex;
+    justify-content: space-between;
+}
+#codigo{
+    background-color: #141414;
+    border: none;
+    color: rgb(255, 255, 255);
+    width: 88%;
+}
+#button{
+    border: none;
+    background-color: #141414;
+}
