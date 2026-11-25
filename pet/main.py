@@ -2,24 +2,20 @@
 import math, os, sys, threading, time, webbrowser
 
 import httpx
-from PySide6.QtCore import Qt, QTimer, Signal, QObject, QPoint
+from PySide6.QtCore import Qt, QTimer, Signal, QObject, QPoint, QRect
 from PySide6.QtGui import QPainter, QPixmap, QAction, QColor
-from PySide6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, QFrame,
-                               QLabel, QLineEdit, QMenu)
+from PySide6.QtWidgets import QApplication, QWidget, QVBoxLayout, QMenu
 
 from fullscreen import fullscreen_app_active
 from look import (EYES, EYE_W, EYE_H, LEGS_X, LEG_TOP, LEG_W, eye_offset, leg_lengths,
                   monocle_on)
+from parchment import Scroll, Note, MENU_STYLE, INK_SOFT
 
 ASSETS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
-SPRITE_SCALE = 3  # o desenho tem 57x41 e aparece 3x maior, sem borrar
+SPRITE_SCALE = 3  # o desenho tem 64x40 e aparece 3x maior, sem borrar
 
 EYE_COLOR = "#0a0a0f"
 BODY_COLOR, MONOCLE_COLOR = "#6c9aff", "#ffd54a"
-
-# cores do balão e da caixa de perguntas
-BG, FG, BORDER = "#000000", "#ffffff", "#555555"
-BOX = f"background:{BG};border:1px solid {BORDER};border-radius:8px;"
 
 API = "http://127.0.0.1:8765"
 POLL_MS = 3000
@@ -67,9 +63,9 @@ class Character(QWidget):
             block(ex + look, ey, EYE_W, EYE_H, EYE_COLOR)
         if monocle_on(now):  # monóculo: aro e cordão no olho direito
             mx, my = EYES[1][0] + look - 3, EYES[1][1] - 2
-            for px, py, w, h in ((2, 0, 5, 1), (2, 9, 5, 1), (0, 2, 1, 6), (8, 2, 1, 6),
-                                 (1, 1, 1, 1), (7, 1, 1, 1), (1, 8, 1, 1), (7, 8, 1, 1),
-                                 (8, 9, 1, 3), (9, 12, 1, 3), (10, 15, 1, 3)):
+            for px, py, w, h in ((2, 0, 6, 1), (2, 11, 6, 1), (0, 2, 1, 8), (9, 2, 1, 8),
+                                 (1, 1, 1, 1), (8, 1, 1, 1), (1, 10, 1, 1), (8, 10, 1, 1),
+                                 (9, 11, 1, 3), (10, 14, 1, 3), (11, 17, 1, 3)):
                 block(mx + px, my + py, w, h, MONOCLE_COLOR)
 
 
@@ -87,23 +83,12 @@ class Pet(QWidget):
 
         lay = QVBoxLayout(self)
         lay.setContentsMargins(4, 4, 4, 4)
-        self.bubble = QLabel()
-        self.bubble.setWordWrap(True)
-        self.bubble.setFixedWidth(300)
-        self.bubble.setStyleSheet(f"{BOX}color:{FG};padding:8px;")
+        lay.setSpacing(2)
+        self.bubble = Scroll()  # o pergaminho das falas
         self.bubble.hide()
-        # onde você digita a pergunta
-        self.input_box = QFrame()
-        self.input_box.setFixedWidth(300)
-        self.input_box.setStyleSheet(f"QFrame{{{BOX}}}")
-        row = QHBoxLayout(self.input_box)
-        row.setContentsMargins(8, 4, 8, 4)
-        self.input = QLineEdit()
-        self.input.setPlaceholderText("Pergunte ao Plato...")
-        self.input.setStyleSheet(f"background:transparent;color:{FG};border:none;"
-                                 f"selection-background-color:{BORDER};")
+        self.input_box = Note("Escreva ao Plato…")  # o bilhete das perguntas
+        self.input = self.input_box.input
         self.input.returnPressed.connect(self.send_chat)
-        row.addWidget(self.input)
         self.input_box.hide()
         self.char = Character()
         lay.addWidget(self.bubble, alignment=Qt.AlignRight)
@@ -117,15 +102,16 @@ class Pet(QWidget):
         self.poll.start(POLL_MS)
 
         geo = QApplication.primaryScreen().availableGeometry()
-        self.adjustSize()
-        self.move(geo.right() - 330, geo.bottom() - 200)
+        # o canto de baixo, à direita, do Plato fica fixo; a janela cresce para cima e para a esquerda
+        self.anchor = QPoint(geo.right() - 136, geo.bottom() - 46)
+        self.relayout()
 
     # --- fala ---
-    def say(self, text, ms=12000):
-        self.bubble.setText(text)
+    def say(self, text, ms=12000, sealed=False):
+        self.bubble.setText(text, sealed)
         self.bubble.show()
         self.char.talking = True
-        self.adjustSize()
+        self.relayout()
         self.hide_timer.start(ms)
         QTimer.singleShot(min(ms, 4000), lambda: setattr(self.char, "talking", False))
 
@@ -133,13 +119,14 @@ class Pet(QWidget):
         self.bubble.hide()
         self.char.talking = False
         self.link = None
-        self.adjustSize()
+        self.relayout()
 
     def show_news(self, n):
         self.link = n.get("link")
-        star = "⭐ " if n.get("priority") else ""
-        self.say(f"{star}<b>{n.get('title_pt') or n['title']}</b><br>{n['comment']}<br>"
-                 f"<small>{n['source']} · clique para abrir</small>", 20000)
+        # notícia prioritária vem lacrada com selo de cera
+        self.say(f"<b>{n.get('title_pt') or n['title']}</b><br>{n['comment']}<br>"
+                 f"<small><i style='color:{INK_SOFT}'>{n['source']} · clique para abrir</i></small>",
+                 20000, sealed=bool(n.get("priority")))
 
     # --- rede (em segundo plano, para a animação não travar) ---
     def poll_news(self):
@@ -160,7 +147,7 @@ class Pet(QWidget):
         if not msg:
             return
         self.input.clear()
-        self.say("Pensando…", 60000)
+        self.say("<i>Molhando a pena no tinteiro…</i>", 60000)
 
         def work():
             try:
@@ -170,22 +157,27 @@ class Pet(QWidget):
                 self.bridge.reply.emit(f"Não consegui falar com o serviço: {e}")
         threading.Thread(target=work, daemon=True).start()
 
+    # --- posição ---
+    def relayout(self):
+        """Ajusta o tamanho ao conteúdo sem tirar o Plato do lugar.
+
+        Tamanho e posição saem juntos, calculados a partir da âncora. Corrigir pela diferença
+        de tamanho (como antes) acumulava erro no X11, onde a janela muda de forma assíncrona,
+        e o Plato ia afundando ou subindo a cada fala.
+        """
+        self.layout().activate()  # senão o tamanho mínimo antigo barra a janela de encolher
+        s = self.sizeHint()
+        if self.hasHeightForWidth():
+            s.setHeight(self.heightForWidth(s.width()))
+        self.setGeometry(QRect(self.anchor - QPoint(s.width() - 1, s.height() - 1), s))
+
     # --- interação ---
-    def resizeEvent(self, e):
-        # o balão e a caixa mudam o tamanho da janela; movemos a janela para o Plato ficar parado
-        if not e.oldSize().isValid():
-            return
-        d = e.oldSize() - e.size()
-        delta = QPoint(d.width(), d.height())
-        self.move(self.pos() + delta)
-        if self.drag is not None:  # isso aconteceu enquanto você arrastava
-            self.drag -= delta
 
     def toggle_chat(self):
         self.input_box.setVisible(not self.input_box.isVisible())
         if self.input_box.isVisible():
             self.input.setFocus()
-        self.adjustSize()
+        self.relayout()
 
     def mousePressEvent(self, e):
         if e.button() == Qt.LeftButton:
@@ -194,6 +186,7 @@ class Pet(QWidget):
     def mouseMoveEvent(self, e):
         if self.drag is not None and e.buttons() & Qt.LeftButton:
             self.move(e.globalPosition().toPoint() - self.drag)
+            self.anchor = self.geometry().bottomRight()
 
     def mouseReleaseEvent(self, e):
         moved = self.drag is not None and (
@@ -207,6 +200,7 @@ class Pet(QWidget):
 
     def contextMenuEvent(self, e):
         m = QMenu(self)
+        m.setStyleSheet(MENU_STYLE)
         m.addAction("Conversar", self.toggle_chat)
         dnd = QAction("Não perturbe", m, checkable=True, checked=self.dnd)
         dnd.toggled.connect(lambda v: setattr(self, "dnd", v))

@@ -30,7 +30,7 @@ cd plato
 
 O serviço (`service/`) lê um feed de cada vez, pede ao LLM um resumo e um comentário, grava a nota e põe a notícia numa fila. Ele atende só neste computador, em `127.0.0.1:8765`.
 
-O pet (`pet/`) olha essa fila a cada poucos segundos e mostra a próxima notícia num balão.
+O pet (`pet/`) olha essa fila a cada poucos segundos e mostra a próxima notícia num pergaminho. As prioritárias chegam com um selo de cera.
 
 Algumas coisas que ele faz sozinho:
 
@@ -145,8 +145,8 @@ O serviço volta sozinho quando o Docker inicia, a não ser que você mesmo o te
 | Você faz | Ele faz |
 |---|---|
 | Arrasta | Muda de lugar |
-| Clica no balão | Abre a notícia no navegador |
-| Dá dois cliques | Abre a caixa de perguntas |
+| Clica no pergaminho | Abre a notícia no navegador |
+| Dá dois cliques | Abre o bilhete para você escrever uma pergunta |
 | Clica com o botão direito | Mostra o menu: "Conversar", "Não perturbe" e "Sair" |
 
 ### Cuidar do serviço
