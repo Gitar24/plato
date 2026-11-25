@@ -6,12 +6,13 @@ Um filósofo de pixel que mora na sua área de trabalho, comenta as notícias co
 
 1. [Como funciona](#como-funciona)
 2. [Primeira instalação](#primeira-instalação)
+   - [No Linux (Mint)](#no-linux-mint)
 3. [No dia a dia](#no-dia-a-dia)
 4. [Ajustes](#ajustes)
 5. [Quando algo dá errado](#quando-algo-dá-errado)
 6. [Referência](#referência)
 
-Todos os comandos são para o PowerShell, dentro da pasta do projeto:
+Os comandos deste guia são para o PowerShell do Windows. No Linux, veja [No Linux (Mint)](#no-linux-mint); os comandos do `docker compose` são os mesmos. Rode tudo dentro da pasta do projeto:
 
 ```powershell
 cd plato
@@ -24,7 +25,7 @@ cd plato
                   │        ▲
      fila e chat  │        │  pergunta ao LLM (Gemini ou Anthropic)
                   ▼        ▼
-               PET (Windows)       LLM
+               PET (Windows/Linux) LLM
 ```
 
 O serviço (`service/`) lê um feed de cada vez, pede ao LLM um resumo e um comentário, grava a nota e põe a notícia numa fila. Ele atende só neste computador, em `127.0.0.1:8765`.
@@ -73,9 +74,71 @@ Você precisa do Docker Desktop, do Python e de uma chave do LLM ([chave do Gemi
    .\run.ps1 pet
    ```
 
+### No Linux (Mint)
+
+Testado pensando no Linux Mint com Cinnamon, que usa X11. Deve funcionar também no Ubuntu e em outras distribuições com X11.
+
+1. Instale o Docker, o Python e a biblioteca de que o Qt precisa:
+
+   ```bash
+   sudo apt install docker.io docker-compose-v2 python3-venv libxcb-cursor0 x11-utils
+   ```
+
+   ```bash
+   sudo usermod -aG docker $USER
+   ```
+
+   Saia da sessão e entre de novo para o grupo `docker` valer.
+
+2. Crie o `.env` e preencha `GEMINI_API_KEY` e `OBSIDIAN_VAULT_PATH` (algo como `/home/voce/Documentos/MeuVault`):
+
+   ```bash
+   [ -f .env ] || cp .env.example .env
+   ```
+
+   Grave no `.env` o seu usuário e grupo. Assim as notas saem no seu nome, e não como root, e o Obsidian consegue editá-las:
+
+   ```bash
+   printf 'PUID=%s\nPGID=%s\n' "$(id -u)" "$(id -g)" >> .env
+   ```
+
+3. Ligue o serviço. Crie a pasta `data` antes, senão o Docker a cria como root:
+
+   ```bash
+   mkdir -p data && docker compose up -d --build
+   ```
+
+4. Prepare o Python do pet:
+
+   ```bash2
+   python3 -m venv ~/.local/venvs/plato
+   ```
+
+   ```bash
+   ~/.local/venvs/plato/bin/pip install -r pet/requirements.txt feedparser APScheduler
+   ```
+
+5. Chame o Plato:
+
+   ```bash
+   ./run.sh pet
+   ```
+
+6. Para ele abrir junto com a sessão:
+
+   ```bash
+   ./run.sh autostart
+   ```
+
+   Ele aparece em "Aplicativos de inicialização" do Mint, onde dá para desligar.
+
+O "não interromper em tela cheia" usa o `xprop` (do pacote `x11-utils`). Numa sessão Wayland não há como saber se algo está em tela cheia, então use o "Não perturbe". O `run.sh` já abre o pet pelo XWayland para ele conseguir ficar no canto da tela.
+
+No Linux, troque `Invoke-RestMethod` por `curl`, por exemplo `curl http://127.0.0.1:8765/health`, e `.\run.ps1` por `./run.sh`.
+
 ## No dia a dia
 
-O serviço volta sozinho quando o Docker inicia, a não ser que você mesmo o tenha parado. Para o pet abrir junto com o Windows, deixe um atalho dele na pasta de inicialização (`shell:startup`).
+O serviço volta sozinho quando o Docker inicia, a não ser que você mesmo o tenha parado. Para o pet abrir junto com o Windows, deixe um atalho dele na pasta de inicialização (`shell:startup`). No Linux, use `./run.sh autostart`.
 
 ### Conversar com o pet
 
@@ -139,6 +202,8 @@ A resposta mostra o `mode` que está rodando de verdade e quantas notícias espe
 | Sintoma | O que fazer |
 |---|---|
 | Mudei o `.env` e nada aconteceu | Rode `docker compose up -d`. O `restart` não relê o arquivo. |
+| No Linux, o pet não abre e fala em "xcb" | Rode `sudo apt install libxcb-cursor0`. |
+| No Linux, o Obsidian não consegue editar as notas | Elas foram gravadas como root. Ajuste `PUID`/`PGID` no `.env`, rode `sudo chown -R $USER: data <vault>/Noticias` e `docker compose up -d`. |
 | O pet não fala nada | Veja o `/health`. Ele também fica quieto com tela cheia ou "Não perturbe". |
 | "coleta pausada" nos logs | A fila encheu. Abra o pet para ele falar o que está esperando. |
 | O chat não responde | Confira a chave no `.env` e procure `[llm] erro` nos logs. |
@@ -180,6 +245,12 @@ docker compose stop
 & $env:USERPROFILE\.local\venvs\plato\Scripts\python.exe -m unittest discover -s tests
 ```
 
+No Linux:
+
+```bash
+~/.local/venvs/plato/bin/python -m unittest discover -s tests
+```
+
 ### Pastas
 
 | Caminho | O que tem |
@@ -190,5 +261,6 @@ docker compose stop
 | `data\` | Histórico e fila |
 | `tests\` | Testes |
 | `docs\` | Plano e desenho do Plato |
-| `run.ps1` | Abre o pet ou o serviço sem Docker |
+| `run.ps1` | Abre o pet ou o serviço sem Docker (Windows) |
+| `run.sh` | O mesmo no Linux, e `autostart` para abrir com a sessão |
 | `docker-compose.yml` | Como o serviço sobe no Docker |

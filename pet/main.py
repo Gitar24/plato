@@ -1,6 +1,5 @@
 """O Plato na área de trabalho. Pergunta ao serviço (localhost:8765) se há notícia e mostra num balão."""
-import math, os, sys, threading, time, webbrowser, ctypes
-from ctypes import wintypes
+import math, os, sys, threading, time, webbrowser
 
 import httpx
 from PySide6.QtCore import Qt, QTimer, Signal, QObject, QPoint
@@ -8,6 +7,7 @@ from PySide6.QtGui import QPainter, QPixmap, QAction, QColor
 from PySide6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, QFrame,
                                QLabel, QLineEdit, QMenu)
 
+from fullscreen import fullscreen_app_active
 from look import (EYES, EYE_W, EYE_H, LEGS_X, LEG_TOP, LEG_W, eye_offset, leg_lengths,
                   monocle_on)
 
@@ -23,25 +23,6 @@ BOX = f"background:{BG};border:1px solid {BORDER};border-radius:8px;"
 
 API = "http://127.0.0.1:8765"
 POLL_MS = 3000
-
-
-def fullscreen_app_active():
-    """Diz se há algo em tela cheia (jogo, vídeo, apresentação), para o Plato ficar quieto."""
-    try:
-        u = ctypes.windll.user32
-        hwnd = u.GetForegroundWindow()
-        if not hwnd:
-            return False
-        cls = ctypes.create_unicode_buffer(64)
-        u.GetClassNameW(hwnd, cls, 64)
-        if cls.value in ("Progman", "WorkerW", "Shell_TrayWnd"):
-            return False
-        r = wintypes.RECT()
-        u.GetWindowRect(hwnd, ctypes.byref(r))
-        return (r.right - r.left >= u.GetSystemMetrics(0)
-                and r.bottom - r.top >= u.GetSystemMetrics(1))
-    except Exception:
-        return False
 
 
 class Bridge(QObject):
