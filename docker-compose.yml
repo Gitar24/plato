@@ -3,6 +3,7 @@ services:
     build: ./service
     container_name: news-service
     restart: unless-stopped
+    user: "${PUID:-0}:${PGID:-0}"  # no Linux, ponha PUID/PGID no .env para as notas saírem com o seu dono
     env_file: .env
     environment:
       - CONFIG_PATH=/app/config/config.json

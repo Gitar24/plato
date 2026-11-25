@@ -1,7 +1,7 @@
 """Olhos, pernas e monóculo do Plato. Não usa Qt, então é fácil de testar."""
 
-EYES = ((17, 12), (37, 12))  # canto de cima, à esquerda, de cada olho no desenho
-EYE_W, EYE_H = 3, 6
+EYES = ((16, 8), (44, 8))  # canto de cima, à esquerda, de cada olho no desenho
+EYE_W, EYE_H = 4, 8
 LOOK = 3  # o quanto os olhos andam para o lado
 
 
@@ -14,8 +14,8 @@ def eye_offset(seconds):
         return LOOK
     return 0
 
-LEGS_X = (9, 21, 33, 45)  # onde começa cada perna
-LEG_TOP, LEG_W, LEG_H, LEG_LIFT = 30, 3, 11, 3
+LEGS_X = (12, 20, 40, 48)  # onde começa cada perna
+LEG_TOP, LEG_W, LEG_H, LEG_LIFT = 32, 4, 8, 3
 
 
 def leg_lengths(seconds):

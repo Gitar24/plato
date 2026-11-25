@@ -14,7 +14,8 @@ class AnchorTest(unittest.TestCase):
     def setUp(self):
         self.pet = main.Pet()
         self.pet.poll.stop()  # para o teste não gastar notícias da fila de verdade
-        self.pet.move(300, 300)
+        self.pet.anchor = QPoint(500, 500)
+        self.pet.relayout()
         self.pet.show()
         app.processEvents()
         self.start = self.where()
@@ -40,6 +41,20 @@ class AnchorTest(unittest.TestCase):
         self.check(lambda: self.pet.say("resposta " * 30))
         self.check(self.pet.toggle_chat)
         self.check(self.pet.hide_bubble)
+
+
+    def test_character_stays_after_quick_changes(self):
+        # tudo de uma vez, sem o Qt respirar no meio: era assim que o Plato afundava
+        def burst():
+            for _ in range(5):
+                self.pet.say("Pensando…", 60000)
+                self.pet.say("resposta longa " * 25)
+                self.pet.toggle_chat()
+                self.pet.hide_bubble()
+                self.pet.say("x " * 80)
+                self.pet.toggle_chat()
+            self.pet.hide_bubble()
+        self.check(burst)
 
 
 if __name__ == "__main__":

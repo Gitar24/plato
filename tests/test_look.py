@@ -9,10 +9,10 @@ class LookTest(unittest.TestCase):
         got = [eye_offset(s) for s in (0, 2.9, 3.5, 4.5, 5.5, 6, 9.5)]
         self.assertEqual(got, [0, 0, -3, 3, 0, 0, -3])
 
-    def test_eyes_stay_on_head(self):  # cabeça: colunas 9 a 47
+    def test_eyes_stay_on_head(self):  # cabeça: colunas 8 a 55
         from look import EYES, EYE_W
         for x, _ in EYES:
-            self.assertTrue(9 <= x - 3 and x + EYE_W - 1 + 3 <= 47)
+            self.assertTrue(8 <= x - 3 and x + EYE_W - 1 + 3 <= 55)
 
 
 if __name__ == "__main__":
