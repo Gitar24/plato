@@ -1,0 +1,7 @@
+.env
+data/
+vault/
+__pycache__/
+.venv/
+backup-plato/
+pet/assets/astronaut*.png

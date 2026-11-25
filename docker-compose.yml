@@ -1,0 +1,16 @@
+services:
+  news-service:
+    build: ./service
+    container_name: news-service
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - CONFIG_PATH=/app/config/config.json
+      - DATA_DIR=/data
+      - VAULT_PATH=/vault
+    volumes:
+      - ./config:/app/config             # edite o config.json sem reconstruir a imagem
+      - ./data:/data                     # o que já foi visto e a fila
+      - "${OBSIDIAN_VAULT_PATH}:/vault"  # onde as notas são gravadas
+    ports:
+      - "127.0.0.1:8765:8765"            # o pet fala com o serviço por aqui, só neste computador

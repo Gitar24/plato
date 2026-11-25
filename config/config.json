@@ -1,0 +1,19 @@
+{
+  "mode": "production",
+  "intervals": {
+    "production": { "normal_seconds": 900,  "priority_seconds": 420 },
+    "test":       { "normal_seconds": 60,   "priority_seconds": 30 }
+  },
+  "language": "português do Brasil",
+  "llm": { "provider": "gemini", "model": "gemini-flash-lite-latest", "max_tokens": 1000 },
+  "vault_subfolder": "Noticias",
+  "feeds": [
+    { "name": "Hacker News",  "url": "https://hnrss.org/frontpage",                     "category": "Tecnologia" },
+    { "name": "The Verge",    "url": "https://www.theverge.com/rss/index.xml",          "category": "Tecnologia" },
+    { "name": "Ars Technica", "url": "https://feeds.arstechnica.com/arstechnica/index", "category": "Tecnologia" },
+    { "name": "BBC World",    "url": "https://feeds.bbci.co.uk/news/world/rss.xml",     "category": "Mundo" }
+  ],
+  "priority_keywords": ["breaking", "urgent", "outage", "vulnerability", "zero-day", "breach", "acquires", "banned"],
+  "max_related": 3,
+  "max_pending": 5
+}
