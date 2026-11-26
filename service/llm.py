@@ -49,7 +49,12 @@ def key_name(cfg):
     return "GEMINI_API_KEY" if provider(cfg) == "gemini" else "ANTHROPIC_API_KEY"
 
 
+class Unusable(Exception):
+    """O LLM respondeu, mas a resposta não serve (bloqueada ou mal formada)."""
+
+
 def complete(cfg, system, messages):
+    """None quando não deu para falar com o LLM; Unusable quando a resposta não serve."""
     key = os.environ.get(key_name(cfg))
     if not key:
         return None
@@ -71,19 +76,28 @@ def complete(cfg, system, messages):
                 },
                 timeout=60,
             )
-            parts = r.json()["candidates"][0]["content"]["parts"]
-            return "".join(p.get("text", "") for p in parts)
-        r = _post(
-            ANTHROPIC_URL,
-            headers={"x-api-key": key, "anthropic-version": "2023-06-01"},
-            json={"model": cfg["llm"]["model"], "max_tokens": cfg["llm"]["max_tokens"],
-                  "system": system, "messages": messages},
-            timeout=60,
-        )
-        return "".join(b.get("text", "") for b in r.json()["content"])
-    except Exception as e:
+        else:
+            r = _post(
+                ANTHROPIC_URL,
+                headers={"x-api-key": key, "anthropic-version": "2023-06-01"},
+                json={"model": cfg["llm"]["model"], "max_tokens": cfg["llm"]["max_tokens"],
+                      "system": system, "messages": messages},
+                timeout=60,
+            )
+    except Exception as e:  # cota, rede, demora ou chave: a notícia não tem culpa
         print(f"[llm] erro: {e}")
         return None
+    try:
+        if provider(cfg) == "gemini":
+            blocks = r.json()["candidates"][0]["content"]["parts"]
+        else:
+            blocks = r.json()["content"]
+        out = "".join(b.get("text", "") for b in blocks)
+    except Exception as e:
+        raise Unusable(f"resposta sem texto: {e!r}")
+    if not out:
+        raise Unusable("resposta vazia")
+    return out
 
 
 def analyze(cfg, title, text, known_titles):
@@ -96,7 +110,10 @@ def analyze(cfg, title, text, known_titles):
     user = (
         f"Notícia:\nTítulo: {title}\nTexto: {text[:3000]}\n\n"
         f"Notas já existentes:\n{notes}\n\n"
-        'Retorne: {"title_pt": "título traduzido para português, natural e curto", '
+        "Se esta notícia contar o MESMO fato de uma nota existente, sem nada de novo, indique em duplicate_of. "
+        "Um desdobramento ou dado novo não é repetição: nesse caso o comment diz o que há de novo "
+        "e cita a notícia anterior.\n"
+        'Retorne: {"duplicate_of": "título EXATO da nota que conta o mesmo fato, ou vazio", "title_pt": "título traduzido para português, natural e curto", '
         '"summary": "resumo neutro de 2-3 frases para a nota do vault", '
         '"category": "uma palavra/tema", '
         '"comment": "o que você FALA em voz alta: um mini resumo da notícia (o que aconteceu e por que importa) '
@@ -109,16 +126,22 @@ def analyze(cfg, title, text, known_titles):
         return None
     m = re.search(r"\{.*\}", out, re.S)
     try:
-        return json.loads(m.group(0)) if m else None
+        info = json.loads(m.group(0)) if m else None
     except json.JSONDecodeError:
-        return None
+        info = None
+    if not isinstance(info, dict) or not info:
+        raise Unusable("resposta sem JSON válido")
+    return info
 
 
 def chat(cfg, context, history, message):
     system = (
         f"{persona(cfg)}\n"
         f"Você está conversando com o seu humano. Responda em {cfg['language']}, em no máximo 3 frases curtas.\n"
-        f"Notícias recentes que você apresentou:\n{context}"
+        f"Notícias que você conhece e pode retomar se o seu humano perguntar:\n{context}"
     )
-    out = complete(cfg, system, history + [{"role": "user", "content": message}])
+    try:
+        out = complete(cfg, system, history + [{"role": "user", "content": message}])
+    except Unusable:
+        return "Sobre isso o LLM não quis responder."
     return out or f"Não consegui responder. Confira a {key_name(cfg)} no .env."

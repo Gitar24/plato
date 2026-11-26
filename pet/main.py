@@ -1,5 +1,5 @@
 """O Plato na área de trabalho. Pergunta ao serviço (localhost:8765) se há notícia e mostra num balão."""
-import math, os, sys, threading, time, webbrowser
+import html, math, os, sys, threading, time, webbrowser
 
 import httpx
 from PySide6.QtCore import Qt, QTimer, Signal, QObject, QPoint, QRect
@@ -10,6 +10,7 @@ from fullscreen import fullscreen_app_active
 from look import (EYES, EYE_W, EYE_H, LEGS_X, LEG_TOP, LEG_W, eye_offset, leg_lengths,
                   monocle_on)
 from parchment import Scroll, Note, MENU_STYLE, INK_SOFT
+from safety import safe_link, domain
 
 ASSETS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
 SPRITE_SCALE = 3  # o desenho tem 64x40 e aparece 3x maior, sem borrar
@@ -76,9 +77,10 @@ class Pet(QWidget):
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.bridge = Bridge()
         self.bridge.news.connect(self.show_news)
-        self.bridge.reply.connect(lambda t: self.say(t, 15000))
+        self.bridge.reply.connect(lambda t: self.say(html.escape(t).replace("\n", "<br>"), 15000))
         self.dnd = False
         self.link = None
+        self.shown = set()  # ids já falados, caso a confirmação se perca
         self.drag = None
 
         lay = QVBoxLayout(self)
@@ -108,6 +110,7 @@ class Pet(QWidget):
 
     # --- fala ---
     def say(self, text, ms=12000, sealed=False):
+        self.link = None  # só a notícia tem link; ela o define depois
         self.bubble.setText(text, sealed)
         self.bubble.show()
         self.char.talking = True
@@ -121,17 +124,41 @@ class Pet(QWidget):
         self.link = None
         self.relayout()
 
+    def busy(self):
+        """Não é hora de interromper; a notícia espera na fila."""
+        return (self.dnd or fullscreen_app_active() or self.bubble.isVisible()
+                or self.input_box.isVisible())
+
     def show_news(self, n):
-        self.link = n.get("link")
+        iid = n.get("id")
+        if iid in self.shown:
+            return self.ack(iid)  # já foi falada: só confirma de novo
+        if self.busy():
+            return  # sem confirmação, ela continua na fila
+        link = safe_link(n.get("link"))
+        where = f"{domain(link)} · clique para abrir" if link else "link não aberto"
+        esc = lambda v: html.escape(str(v or ""))  # texto do feed e do LLM nunca vira código
         # notícia prioritária vem lacrada com selo de cera
-        self.say(f"<b>{n.get('title_pt') or n['title']}</b><br>{n['comment']}<br>"
-                 f"<small><i style='color:{INK_SOFT}'>{n['source']} · clique para abrir</i></small>",
+        self.say(f"<b>{esc(n.get('title_pt') or n.get('title'))}</b><br>{esc(n.get('comment'))}<br>"
+                 f"<small><i style='color:{INK_SOFT}'>{esc(n.get('source'))} · {esc(where)}</i></small>",
                  20000, sealed=bool(n.get("priority")))
+        self.link = link
+        self.shown.add(iid)
+        self.ack(iid)
+
+    def ack(self, iid):
+        """Avisa o serviço que a notícia foi falada, para ele tirá-la da fila."""
+        def work():
+            try:
+                httpx.post(f"{API}/ack", json={"id": iid}, timeout=5)
+            except Exception:
+                pass  # o serviço manda de novo e confirmamos outra vez
+        threading.Thread(target=work, daemon=True).start()
 
     # --- rede (em segundo plano, para a animação não travar) ---
     def poll_news(self):
-        if self.dnd or fullscreen_app_active() or self.bubble.isVisible() or self.input_box.isVisible():
-            return  # não é hora de interromper; a notícia espera na fila
+        if self.busy():
+            return
 
         def work():
             try:
@@ -188,15 +215,20 @@ class Pet(QWidget):
             self.move(e.globalPosition().toPoint() - self.drag)
             self.anchor = self.geometry().bottomRight()
 
+    def on_scroll(self, e):
+        return self.bubble.isVisible() and self.bubble.geometry().contains(e.position().toPoint())
+
     def mouseReleaseEvent(self, e):
         moved = self.drag is not None and (
             e.globalPosition().toPoint() - self.frameGeometry().topLeft() - self.drag).manhattanLength() > 3
         self.drag = None
-        if e.button() == Qt.LeftButton and not moved and self.link:
+        # só o pergaminho abre a notícia; o link é conferido de novo na hora de abrir
+        if e.button() == Qt.LeftButton and not moved and self.on_scroll(e) and safe_link(self.link):
             webbrowser.open(self.link)
 
     def mouseDoubleClickEvent(self, e):
-        self.toggle_chat()
+        if not self.on_scroll(e):
+            self.toggle_chat()
 
     def contextMenuEvent(self, e):
         m = QMenu(self)

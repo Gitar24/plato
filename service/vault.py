@@ -1,5 +1,5 @@
 """Grava as notícias como notas do Obsidian e liga umas às outras com [[links]]."""
-import os, re
+import json, os, re, unicodedata
 from datetime import datetime
 import config
 
@@ -27,16 +27,22 @@ def fallback_related(title, known_titles, limit):
 
 
 def write_note(cfg, *, title, summary, source, category, link, related, title_pt=""):
-    name = clean_name(title)
+    base = name = clean_name(title)
+    n = 1
+    while os.path.exists(os.path.join(folder(cfg), name + ".md")):
+        n += 1
+        name = f"{base} ({n})"
     related = [r for r in related if r != name]
-    tag = re.sub(r"[^a-z0-9]", "", category.lower()) or "geral"
+    plain = unicodedata.normalize("NFKD", str(category).lower())
+    tag = re.sub(r"[^a-z0-9]", "", plain) or "geral"
+    quote = lambda v: json.dumps(str(v), ensure_ascii=False)  # texto entre aspas é YAML válido
     lines = [
         "---",
-        f'title: "{name}"',
+        f"title: {quote(name)}",
         f"date: {datetime.now().isoformat(timespec='seconds')}",
-        f"source: {source}",
-        f"category: {category}",
-        f"link: {link}",
+        f"source: {quote(source)}",
+        f"category: {quote(category)}",
+        f"link: {quote(link)}",
         f"tags: [noticia, {tag}]",
         "---",
         f"# {name}", "",

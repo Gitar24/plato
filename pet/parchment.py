@@ -57,6 +57,7 @@ class Scroll(QFrame):
         self.setFixedWidth(WIDTH)
         self.label = QLabel()
         self.label.setWordWrap(True)
+        self.label.setTextFormat(Qt.RichText)  # senão o texto escapado pode aparecer como &lt;
         self.label.setStyleSheet(f"background:transparent;color:{INK};{FONT}")
         lay = QVBoxLayout(self)
         lay.setContentsMargins(6 * U, ROLL_H + 3 * U, 6 * U, ROLL_H + 3 * U)
