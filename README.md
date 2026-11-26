@@ -34,7 +34,9 @@ O pet (`pet/`) olha essa fila a cada poucos segundos e mostra a próxima notíci
 
 Algumas coisas que ele faz sozinho:
 
-- Não repete notícia. O que já foi visto fica em `data/history.json`.
+- Não repete notícia. O que já foi visto fica em `data/history.json`, e o mesmo fato contado por outro site é pulado. Um desdobramento é falado, citando a notícia anterior.
+- Não fala notícia velha. Com mais de `max_age_days` (4) dias, ou sem data, ela é descartada. As mais novas vêm primeiro, alternando as fontes.
+- Desiste de uma notícia depois de 3 respostas inutilizáveis do LLM. Falta de cota ou de internet não conta.
 - Não interrompe. Com algo em tela cheia, ou com "Não perturbe" ligado, a notícia espera na fila.
 - Pausa a coleta quando há 5 notícias esperando.
 - Adianta a próxima busca quando a notícia é prioritária: tem a ver com notas anteriores, o LLM a marcou como importante ou o título tem uma das `priority_keywords`.
@@ -110,7 +112,7 @@ Testado pensando no Linux Mint com Cinnamon, que usa X11. Deve funcionar também
 
 4. Prepare o Python do pet:
 
-   ```bash2
+   ```bash
    python3 -m venv ~/.local/venvs/plato
    ```
 
@@ -145,7 +147,7 @@ O serviço volta sozinho quando o Docker inicia, a não ser que você mesmo o te
 | Você faz | Ele faz |
 |---|---|
 | Arrasta | Muda de lugar |
-| Clica no pergaminho | Abre a notícia no navegador |
+| Clica no pergaminho | Abre a notícia no navegador, se o link for um `https` comum. O domínio aparece antes do clique; isso não garante que o site seja seguro. |
 | Dá dois cliques | Abre o bilhete para você escrever uma pergunta |
 | Clica com o botão direito | Mostra o menu: "Conversar", "Não perturbe" e "Sair" |
 
@@ -172,6 +174,7 @@ O histórico e as notas continuam no lugar mesmo depois do `down`.
 | Intervalos, feeds, palavras de prioridade | `config\config.json` | Sozinho, no próximo ciclo |
 | Modelo e provedor do LLM | `llm` no `config\config.json` | Sozinho |
 | Tamanho da fila | `max_pending` no `config\config.json` | Sozinho, no próximo ciclo |
+| Idade máxima da notícia | `max_age_days` no `config\config.json` | Sozinho |
 | Personalidade | `persona` no `config\config.json`, ou `DEFAULT_PERSONA` em `service\llm.py` | O JSON vale sozinho; o código pede `--build` |
 
 ### Modos
@@ -216,7 +219,7 @@ A resposta mostra o `mode` que está rodando de verdade e quantas notícias espe
 | Comando | O que faz |
 |---|---|
 | `Invoke-RestMethod http://127.0.0.1:8765/health` | Só consulta o estado |
-| `Invoke-RestMethod http://127.0.0.1:8765/next` | Entrega a notícia mais antiga e a tira da fila. O pet não vai mais falar essa. |
+| `Invoke-RestMethod http://127.0.0.1:8765/next` | Mostra a próxima notícia. Ela só sai da fila quando o pet confirma em `/ack`. |
 
 Para conversar sem o pet (gasta cota do LLM):
 

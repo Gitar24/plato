@@ -15,5 +15,6 @@
   ],
   "priority_keywords": ["breaking", "urgent", "outage", "vulnerability", "zero-day", "breach", "acquires", "banned"],
   "max_related": 3,
-  "max_pending": 5
+  "max_pending": 5,
+  "max_age_days": 4
 }
